@@ -1,127 +1,185 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
-const LINES = [
-  { t: 0,    text: '$ prescient connect prometheus:9090',     color: '#555' },
-  { t: 700,  text: '✓ 1,247 metrics. Baselines ready.',       color: '#00ff87' },
-  { t: 1400, text: '⚠ checkout_latency_p99 +340% — anomaly', color: '#ffb800' },
-  { t: 2100, text: '→ root cause: cart OOM, cascading',       color: '#888' },
-  { t: 2800, text: '→ fix: kubectl rollout restart cart',     color: '#888' },
-  { t: 3500, text: '✓ resolved in 47s. on-call not paged.',   color: '#00ff87' },
+const G = '#00ff87'   // green
+const A = '#ffb800'   // amber
+const D = '#444'      // dim
+const W = '#e0e0e0'   // white
+
+type Line = { text: string; color: string; delay: number }
+
+const BOOT_LINES: Line[] = [
+  { delay: 0,    text: 'prescient v0.1.0-beta',                          color: W },
+  { delay: 200,  text: 'connecting to prometheus:9090...',                color: D },
+  { delay: 900,  text: '✓ connected — 1,247 metrics indexed',            color: G },
+  { delay: 1100, text: 'building adaptive baselines...',                  color: D },
+  { delay: 1800, text: '✓ baselines ready — watching.',                   color: G },
+  { delay: 2200, text: '',                                                color: D },
+  { delay: 2400, text: '⚠  anomaly detected',                            color: A },
+  { delay: 2600, text: '   metric: checkout_latency_p99',                 color: D },
+  { delay: 2800, text: '   current: 3,240ms  baseline: 740ms  +338%',    color: A },
+  { delay: 3100, text: '',                                                color: D },
+  { delay: 3300, text: 'investigating...',                                color: D },
+  { delay: 4200, text: '→ cross-correlating 47 related metrics',         color: D },
+  { delay: 4800, text: '→ searching incident memory (3 matches)',        color: D },
+  { delay: 5400, text: '',                                                color: D },
+  { delay: 5600, text: 'root cause hypothesis (confidence: 0.91)',       color: W },
+  { delay: 5800, text: '   cart-service OOM → connection pool exhausted', color: D },
+  { delay: 6000, text: '   cascading to checkout — same pattern as 2025-11-03', color: D },
+  { delay: 6200, text: '',                                                color: D },
+  { delay: 6400, text: 'suggested remediation [risk: LOW]',               color: G },
+  { delay: 6600, text: '   kubectl rollout restart deployment/cart',      color: G },
+  { delay: 6800, text: '',                                                color: D },
+  { delay: 7000, text: 'auto-executing in 5s  (ctrl+z to cancel)',       color: D },
+  { delay: 7500, text: '...',                                             color: D },
+  { delay: 8500, text: '✓ rollout complete — latency returning to baseline', color: G },
+  { delay: 8800, text: '✓ resolved in 52s — on-call not paged.',         color: G },
 ]
 
-function Terminal() {
-  const [visible, setVisible] = useState<number[]>([])
-  const [done, setDone] = useState(false)
+function TerminalPage() {
+  const [lines, setLines] = useState<Line[]>([])
+  const [phase, setPhase] = useState<'booting' | 'done' | 'waitlist'>('booting')
+  const [email, setEmail] = useState('')
+  const [submitted, setSubmitted] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    LINES.forEach((line, i) => {
+    BOOT_LINES.forEach((line, i) => {
       setTimeout(() => {
-        setVisible(v => [...v, i])
-        if (i === LINES.length - 1) setTimeout(() => setDone(true), 600)
-      }, line.t + 300)
+        setLines(prev => [...prev, line])
+        if (i === BOOT_LINES.length - 1) {
+          setTimeout(() => setPhase('done'), 1200)
+        }
+      }, line.delay)
     })
   }, [])
 
-  return (
-    <div style={{ border: '1px solid #1a1a1a', borderRadius: 8, overflow: 'hidden', background: '#0c0c0c', width: '100%', maxWidth: 480 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 14px', borderBottom: '1px solid #141414' }}>
-        <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#222' }} />
-        <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#222' }} />
-        <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#222' }} />
-      </div>
-      <div style={{ padding: '16px 18px', minHeight: 160, fontSize: 12, lineHeight: '1.9', letterSpacing: '0.01em' }}>
-        {LINES.map((line, i) => (
-          <div key={i} style={{ color: line.color, opacity: visible.includes(i) ? 1 : 0, transition: 'opacity 0.3s' }}>
-            {line.text}
-          </div>
-        ))}
-        {done && <div style={{ marginTop: 4 }}><span className="cursor" /></div>}
-      </div>
-    </div>
-  )
-}
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [lines, phase])
 
-function Form() {
-  const [email, setEmail] = useState('')
-  const [done, setDone] = useState(false)
-  const [loading, setLoading] = useState(false)
-
-  async function submit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!email) return
     setLoading(true)
     try { await fetch('/api/waitlist', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) }) } catch {}
-    setTimeout(() => { setLoading(false); setDone(true) }, 500)
+    setTimeout(() => { setLoading(false); setSubmitted(true) }, 400)
   }
 
-  if (done) return <p style={{ fontSize: 13, color: '#00ff87' }}>✓ you are on the list.</p>
-
   return (
-    <form onSubmit={submit} style={{ display: 'flex', gap: 8, width: '100%', maxWidth: 400 }}>
-      <input
-        type="email"
-        value={email}
-        onChange={e => setEmail(e.target.value)}
-        placeholder="you@company.com"
-        required
-        style={{ flex: 1, background: '#0f0f0f', border: '1px solid #222', borderRadius: 6, padding: '10px 14px', fontSize: 13, color: '#ccc', fontFamily: 'inherit', outline: 'none' }}
-        onFocus={e => { e.target.style.borderColor = '#00ff87' }}
-        onBlur={e => { e.target.style.borderColor = '#222' }}
-      />
-      <button
-        type="submit"
-        disabled={loading}
-        style={{ background: '#00ff87', color: '#000', border: 'none', borderRadius: 6, padding: '10px 20px', fontSize: 13, fontFamily: 'inherit', fontWeight: 500, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1, whiteSpace: 'nowrap' }}
-      >
-        {loading ? '...' : 'join waitlist →'}
-      </button>
-    </form>
-  )
-}
+    <div style={{
+      minHeight: '100vh',
+      padding: '48px 32px 80px',
+      maxWidth: 680,
+      margin: '0 auto',
+      fontSize: 13,
+      lineHeight: '1.9',
+      letterSpacing: '0.01em',
+    }}>
 
-export default function Home() {
-  return (
-    <main style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 24px' }}>
-
-      <nav style={{ position: 'fixed', top: 0, left: 0, right: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 32px', borderBottom: '1px solid #111' }}>
-        <span style={{ color: '#00ff87', fontSize: 15, fontWeight: 500, letterSpacing: '-0.02em' }}>prescient</span>
-        <a href="https://github.com/munindranath/prescient" target="_blank" rel="noopener noreferrer" style={{ color: '#333', fontSize: 12, textDecoration: 'none' }}
+      {/* header */}
+      <div style={{ marginBottom: 48, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <span style={{ color: G, fontWeight: 500, fontSize: 14 }}>prescient</span>
+        <a href="https://github.com/munindranath/prescient" target="_blank" rel="noopener noreferrer"
+          style={{ color: D, fontSize: 12, textDecoration: 'none' }}
           onMouseEnter={e => (e.currentTarget.style.color = '#666')}
-          onMouseLeave={e => (e.currentTarget.style.color = '#333')}>
+          onMouseLeave={e => (e.currentTarget.style.color = D)}>
           github ↗
         </a>
-      </nav>
-
-      <div style={{ textAlign: 'center', maxWidth: 520, width: '100%' }}>
-
-        <p className="fade-up-1" style={{ fontSize: 11, color: '#333', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 32 }}>
-          early access
-        </p>
-
-        <h1 className="fade-up-2" style={{ fontSize: 'clamp(38px, 6vw, 58px)', fontWeight: 500, letterSpacing: '-0.03em', lineHeight: 1.1, color: '#fff', marginBottom: 20 }}>
-          knows before<br /><span style={{ color: '#00ff87' }}>you ask.</span>
-        </h1>
-
-        <p className="fade-up-3" style={{ fontSize: 14, color: '#3a3a3a', lineHeight: 1.8, marginBottom: 44, maxWidth: 360, margin: '0 auto 44px' }}>
-          AI SRE agent. Detects anomalies, generates insights, and remediates — before your on-call gets paged.
-        </p>
-
-        <div className="fade-up-4" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, marginBottom: 60 }}>
-          <Form />
-          <span style={{ fontSize: 11, color: '#222' }}>no spam · unsubscribe anytime</span>
-        </div>
-
-        <div className="fade-up-4" style={{ display: 'flex', justifyContent: 'center' }}>
-          <Terminal />
-        </div>
-
       </div>
 
-      <footer style={{ position: 'fixed', bottom: 0, left: 0, right: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px 32px', borderTop: '1px solid #0e0e0e' }}>
-        <span style={{ fontSize: 11, color: '#222' }}>© 2026 Prescient · open-source · MIT</span>
-      </footer>
+      {/* tagline */}
+      <div style={{ marginBottom: 48 }}>
+        <p style={{ color: W, fontSize: 'clamp(20px, 3vw, 26px)', fontWeight: 400, letterSpacing: '-0.02em', lineHeight: 1.3 }}>
+          knows before you ask.
+        </p>
+        <p style={{ color: D, marginTop: 10, fontSize: 12, maxWidth: 440 }}>
+          AI SRE agent — detects anomalies, investigates root cause, remediates.
+          <br />before your on-call gets paged.
+        </p>
+      </div>
 
-    </main>
+      {/* terminal output */}
+      <div style={{ marginBottom: 40 }}>
+        {lines.map((line, i) => (
+          <div key={i} style={{ color: line.color, minHeight: '1.9em' }} className="line">
+            {line.text}
+          </div>
+        ))}
+
+        {/* cursor while booting */}
+        {phase === 'booting' && lines.length > 0 && (
+          <span style={{ color: G }} className="blink">▊</span>
+        )}
+
+        {/* waitlist prompt */}
+        {phase === 'done' && !submitted && (
+          <div style={{ marginTop: 24 }}>
+            <div style={{ color: D, marginBottom: 8 }}>
+              — want early access?
+            </div>
+            <form onSubmit={handleSubmit} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ color: G }}>$</span>
+              <input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="you@company.com"
+                required
+                autoFocus
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  borderBottom: '1px solid #222',
+                  color: W,
+                  fontFamily: 'inherit',
+                  fontSize: 13,
+                  outline: 'none',
+                  padding: '2px 4px',
+                  width: 240,
+                }}
+                onFocus={e => { e.target.style.borderBottomColor = G }}
+                onBlur={e => { e.target.style.borderBottomColor = '#222' }}
+              />
+              <button
+                type="submit"
+                disabled={loading}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: G,
+                  fontFamily: 'inherit',
+                  fontSize: 13,
+                  cursor: 'pointer',
+                  padding: 0,
+                  opacity: loading ? 0.5 : 1,
+                }}
+              >
+                {loading ? 'joining...' : '[enter]'}
+              </button>
+            </form>
+          </div>
+        )}
+
+        {phase === 'done' && submitted && (
+          <div style={{ marginTop: 24, color: G }}>
+            ✓ you are on the list. we will reach out before launch.
+          </div>
+        )}
+
+        {(phase === 'done' || submitted) && (
+          <div ref={bottomRef} />
+        )}
+      </div>
+
+      {/* footer */}
+      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: '16px 32px', borderTop: '1px solid #0e0e0e' }}>
+        <span style={{ fontSize: 11, color: '#1e1e1e' }}>© 2026 prescient · open-source · MIT</span>
+      </div>
+
+    </div>
   )
 }
+
+export default TerminalPage
