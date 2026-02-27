@@ -1,3 +1,0 @@
-module.exports=[33290,a=>{"use strict";var b=a.i(7997);function c({children:a}){return(0,b.jsx)("html",{lang:"en",children:(0,b.jsx)("body",{children:a})})}a.s(["default",()=>c,"metadata",0,{title:"Prescient — AI SRE Agent",description:"Knows before you ask. AI SRE agent that detects anomalies, generates insights, and remediates — before your on-call gets paged.",keywords:"AI SRE, observability, anomaly detection, incident response, DevOps automation",openGraph:{title:"Prescient — AI SRE Agent",description:"Knows before you ask.",url:"https://tryprescient.io",siteName:"Prescient",type:"website"},twitter:{card:"summary_large_image",title:"Prescient — AI SRE Agent",description:"Knows before you ask."}}])}];
-
-//# sourceMappingURL=app_layout_tsx_271801d7._.js.map
